@@ -1,0 +1,38 @@
+---
+title: "R Notebook"
+#output: html_notebook
+---
+
+# Salmon project
+
+By: Amalia de Juana, Louise Stauber Näslund, Hanna Linn
+
+This is a recreation of parts of the paper:
+Jin Y, Olsen RE, Harvey TN, et al.
+Comparative transcriptomics reveals domestication-associated
+features of Atlantic salmon lipid metabolism. Mol Ecol.
+2020;29:1860–1872. https://doi.org/10.1111/mec.15446
+
+"As a team, you will write a short report (max 1500-2000 words, try to be concise!) in article format (Introduction, results, discussion, methods sections at least should be there)"
+
+
+## Introduction
+
+Salmons swim.
+
+## Methods
+
+
+
+### Data analysis
+
+### Looking at fatty tissue
+Original paper did this, we did not.
+
+## Results
+
+Figure
+
+## Discussion
+
+This was hard, this was easier.
