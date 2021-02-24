@@ -20,7 +20,7 @@ Setting up an environment:
 export PATH="/home/student14/miniconda3/bin:$PATH"
 conda create --name salmonenvironment
 source activate salmonenvironment
-conda install -c conda-forge r=3.4.1
+conda install -c bioconda htseq cutadapt star
 ```
 Also source ~/.bashrc if above does not work.
 
@@ -28,15 +28,6 @@ Also source ~/.bashrc if above does not work.
 Restarting the environment:
 ```{bash}
 source activate salmonenvironment
-```
-
-Packages:
-```{r}
-require(devtools)
-install_version("tidyverse", version = 1.3)
-R.version
-library("tidyverse")
-print('run something please')
 ```
 
 
@@ -54,12 +45,68 @@ Explore the hypothesis that the change to a vegetable oil diet has unintentional
 
 ### Data analysis
 
-Normalize counts: CPM 
+0. Get data
+
+```{bash}
+cat E-MTAB-8306.sdrf.txt | grep -P "\tdomesticated" | grep -P "\tfish\soil" | grep -P "\tpyloric\scaecum" | cut -f37 | tail -n +2 > domesticated.txt
+wget -N -i domesticated.txt
+```
+
+Preprocess data
+
+In bash:
+1. REMOVE ADAPTERS AND FILTER DATA (method ok, data usure, no space)
+Get FASTQ-files from https://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-8306/.
+Remove adapters in the FASTQ-files with cutadapt. Using Read 1 from https://support.illumina.com/content/dam/illumina-support/documents/documentation/chemistry_documentation/experiment-design/illumina-adapter-sequences-1000000002694-14.pdf
+AGATCGGAAGAGCACACGTCTGAACTCCAGTCA. Here it also filter out read shorter than 40 nucleotides and reads with quality score below 20.
+
+```{bash}
+for i in {22994..23015};
+do cutadapt --report=minimal -q 20 -m 40 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA ERR35${i}.fastq.gz > ERR35${i}_trimmed.fastq.gz;
+done
+for i in {23017..23025};
+do cutadapt --report=minimal -q 20 -m 40 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA ERR35${i}.fastq.gz > ERR35${i}_trimmed.fastq.gz;
+done
+
+```
+
+ERROR: NO SPACE LEFT.
+
+2. ALIGN (usure of data, usure of method)
+Get the FASTA-files with the Salmo Salar sequences from https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/233/375/GCF_000233375.1_ICSASG_v2/GCF_000233375.1_ICSASG_v2_genomic.fna.gz
+
+```{bash}
+wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/233/375/GCF_000233375.1_ICSASG_v2/GCF_000233375.1_ICSASG_v2_genomic.fna.gz
+```
+
+Get the GFF-file for the genome annotation https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/233/375/GCF_000233375.1_ICSASG_v2/GCF_000233375.1_ICSASG_v2_genomic.gff.gz
+
+```{bash}
+wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/233/375/GCF_000233375.1_ICSASG_v2/GCF_000233375.1_ICSASG_v2_genomic.gff.gz
+```
+
+Align all read sequences from FASTQ-files to FASTA-files with star.
+
+Manual for star https://github.com/alexdobin/STAR/blob/master/doc/STARmanual.pdf
+https://bioinformatics.uconn.edu/resources-and-events/tutorials-2/rna-seq-tutorial-with-reference-genome/
+
+Method from https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-018-4651-8#Sec2.
+
+3. GENE COUNT (haven't got this far)
+Generate raw gene counts using htsec.
+
+```{bash}
+
+```
+
+
+4. Normalize counts: CPM 
 Filter the CPM counts so that we keep genes that have a CPM count >1 in more than 25% of the samples, done both for pyloric caeca and liver.
 For differential expression analysis between wild and domesticated under any diet, we use egdeR, using a full interaction model (see paper) -> output will be p-values 
-Adjust p-values using FDR, genes are differentially expressed if  q < 0.05 and the absolute log2 fold change >1 between wild and domesticated (=> log2(wild_counts/domesticated_counts).
+Adjust p-values using FDR, genes are deferentially expressed if  q < 0.05 and the absolute log2 fold change >1 between wild and domesticated (=> log2(wild_counts/domesticated_counts).
 KEGG ontology enrichment analysis using edgeR. Enriched pathways were significant if p-value < 0.05. P-values were generated based on a hypergeometric test where the number of DEGs were compared to the total genes annotated to each KO term. 
-To investigate diet specific effects on gene expression, they checked for differentially expressed genes between wild and domesticated under each diet. The same cut-offs were used as before
+To investigate diet specific effects on gene expression, they checked for deferentially expressed genes between wild and domesticated under each diet. The same cut-offs were used as before
+
 
 ### Looking at fatty tissue (this)
 Original paper did this, we did not.
