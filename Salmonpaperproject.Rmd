@@ -20,13 +20,14 @@ Setting up an environment:
 export PATH="/home/student14/miniconda3/bin:$PATH"
 conda create --name salmonenvironment
 source activate salmonenvironment
-conda install -c bioconda htseq cutadapt star
+conda install -c bioconda htseq cutadapt star gffread
 ```
 Also source ~/.bashrc if above does not work.
 
 
 Restarting the environment:
 ```{bash}
+source ~/.bashrc
 source activate salmonenvironment
 ```
 
@@ -45,12 +46,29 @@ Explore the hypothesis that the change to a vegetable oil diet has unintentional
 
 ### Data analysis
 
-0. Get data
+0. Get data Domesticated
+Filter for:
+* diet: fish oil
+* tissue: pyloric caeca
+* strain: domesticated
 
 ```{bash}
 cat E-MTAB-8306.sdrf.txt | grep -P "\tdomesticated" | grep -P "\tfish\soil" | grep -P "\tpyloric\scaecum" | cut -f37 | tail -n +2 > domesticated.txt
 wget -N -i domesticated.txt
 ```
+
+0. Get data Wild
+Filter for:
+* diet: fish oil
+* tissue: pyloric caeca
+* strain: wild
+
+(not run)
+```{bash} 
+cat E-MTAB-8306.sdrf.txt | grep -P "\twild" | grep -P "\tfish\soil" | grep -P "\tpyloric\scaecum" | cut -f37 | tail -n +2 > wild.txt
+wget -N -i wild.txt
+```
+
 
 Preprocess data
 
@@ -60,52 +78,164 @@ Get FASTQ-files from https://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-8306/
 Remove adapters in the FASTQ-files with cutadapt. Using Read 1 from https://support.illumina.com/content/dam/illumina-support/documents/documentation/chemistry_documentation/experiment-design/illumina-adapter-sequences-1000000002694-14.pdf
 AGATCGGAAGAGCACACGTCTGAACTCCAGTCA. Here it also filter out read shorter than 40 nucleotides and reads with quality score below 20.
 
+Domesticated:
 ```{bash}
-for i in {22994..23015};
-do cutadapt --report=minimal -q 20 -m 40 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA ERR35${i}.fastq.gz > ERR35${i}_trimmed.fastq.gz;
-done
-for i in {23017..23025};
-do cutadapt --report=minimal -q 20 -m 40 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA ERR35${i}.fastq.gz > ERR35${i}_trimmed.fastq.gz;
+for i in {3522994..3522997} {3523017..3523025} {3523030..3523033};
+do cutadapt --report=minimal -q 20 -m 40 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA ERR${i}.fastq.gz > ERR${i}_trimmed.fastq.gz;
 done
 
 ```
 
-ERROR: NO SPACE LEFT.
 
-2. ALIGN (usure of data, usure of method)
-Get the FASTA-files with the Salmo Salar sequences from https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/233/375/GCF_000233375.1_ICSASG_v2/GCF_000233375.1_ICSASG_v2_genomic.fna.gz
+2. ALIGN
+Get the FASTA-files with the Salmo Salar reference genome (ICSASG_v2) from https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/233/375/GCF_000233375.1_ICSASG_v2/GCF_000233375.1_ICSASG_v2_genomic.fna.gz
 
 ```{bash}
+mkdir data
 wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/233/375/GCF_000233375.1_ICSASG_v2/GCF_000233375.1_ICSASG_v2_genomic.fna.gz
+mkdir data/salmonReferenceGenome
+mv GCF_000233375.1_ICSASG_v2_genomic.fna.gz data/salmonReferenceGenome
+
 ```
 
 Get the GFF-file for the genome annotation https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/233/375/GCF_000233375.1_ICSASG_v2/GCF_000233375.1_ICSASG_v2_genomic.gff.gz
 
 ```{bash}
 wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/233/375/GCF_000233375.1_ICSASG_v2/GCF_000233375.1_ICSASG_v2_genomic.gff.gz
+mkdir data/salmonAnnotationGenome
+mv GCF_000233375.1_ICSASG_v2_genomic.gff.gz data/salmonAnnotationGenome
+
 ```
 
 Align all read sequences from FASTQ-files to FASTA-files with star.
+
+```{bash}
+# make directory /data/salmonGenomeIndex
+mkdir data/salmonGenomeIndex
+
+# GFF to GTF, unziped
+gffread <(gunzip -c data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gff.gz) -T -o data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gtf
+
+# unzip the FASTA-file
+gunzip data/salmonReferenceGenome/GCF_000233375.1_ICSASG_v2_genomic.fna.gz
+
+# fixing memory error
+grep ">" data/salmonReferenceGenome/GCF_000233375.1_ICSASG_v2_genomic.fna | wc -l # gives 232155
+# set --genomeChrBinNbits = min(18,log2[max(GenomeLength/NumberOfRef, ReadLength)])
+# NumberOfRef = 232155
+# GenomeLength = 2966890203 (from webpage where the ref genome is from)
+# ReadLength = 100 (from paper)
+# gives --genomeChrBinNbits = 14
+
+
+# create a genome annotation index
+STAR --runMode genomeGenerate --genomeDir data/salmonGenomeIndex/ --genomeFastaFiles data/salmonReferenceGenome/GCF_000233375.1_ICSASG_v2_genomic.fna --sjdbGTFfile data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gtf --sjdbOverhang 100 --limitGenomeGenerateRAM 168253806176 --genomeChrBinNbits 14
+
+
+# (not run)
+# move ERR${i}_trimmed.fastq.gz to /data/salmonTrimmedFastqs and delete 
+# map the trimmed sequences to the index
+# Domesticated
+mkdir data/salmonTrimmedFastqsDomesticated
+for i in {3522994..3522997} {3523017..3523025} {3523030..3523033};
+do mv ERR${i}_trimmed.fastq.gz /data/salmonTrimmedFastqsDomesticated;
+do rm ERR${i}.fastq.gz;
+do STAR --genomeDir data/salmonGenomeIndex/ --readFilesIn <(gunzip -c data/salmonTrimmedFastqsDomesticated/ERR${i}_trimmed.fastq.gz) --outSAMtype BAM SortedByCoordinate --outFileNamePrefix ERR${i}; #where do the files go?
+done
+
+# (modify numbers, run)
+# Wild 
+mkdir data/salmonTrimmedFastqsWild
+for i in {3522994..3522997} {3523017..3523025} {3523030..3523033};
+do cutadapt --report=minimal -q 20 -m 40 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA ERR${i}.fastq.gz > data/salmonTrimmedFastqsWild/ERR${i}_trimmed.fastq.gz;
+do rm ERR${i}.fastq.gz;
+do STAR --genomeDir data/salmonGenomeIndex/ --readFilesIn <(gunzip -c data/salmonTrimmedFastqsWild/ERR${i}_trimmed.fastq.gz) --outSAMtype BAM SortedByCoordinate --outFileNamePrefix ERR${i}; #where do the files go?
+done
+
+```
 
 Manual for star https://github.com/alexdobin/STAR/blob/master/doc/STARmanual.pdf
 https://bioinformatics.uconn.edu/resources-and-events/tutorials-2/rna-seq-tutorial-with-reference-genome/
 
 Method from https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-018-4651-8#Sec2.
 
-3. GENE COUNT (haven't got this far)
+3. GENE COUNT
 Generate raw gene counts using htsec.
 
 ```{bash}
+# Domesticated
+mkdir data/salmonCountsDomesticated
+# Convert BAM Files to Raw Counts with HTSeq
+for i in {3522994..3522997} {3523017..3523025} {3523030..3523033};
+do htseq-count -s no -r pos —t exon -i pacid -f bam data/salmonGenomeIndex/ERR${i}Aligned.sortedByCoord.out.bam data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gtf > dada/salmonCountsDomesticated/ERR${i}-output_basename.counts;
+done
+
+# Wild
+# (modify numbers)
+mkdir data/salmonCountsWild
+# Convert BAM Files to Raw Counts with HTSeq
+for i in {3522994..3522997} {3523017..3523025} {3523030..3523033};
+do htseq-count -s no -r pos —t exon -i pacid -f bam data/salmonGenomeIndex/ERR${i}Aligned.sortedByCoord.out.bam data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gtf > dada/salmonCountsWild/ERR${i}-output_basename.counts;
+done
 
 ```
 
 
-4. Normalize counts: CPM 
-Filter the CPM counts so that we keep genes that have a CPM count >1 in more than 25% of the samples, done both for pyloric caeca and liver.
+---------------------- R --------------------------------
+
+4. NORMALIZE COUNT
+CPM (Counts per million)
+Filter the CPM counts so that we keep genes that have a CPM count >1 in more than 25% of the samples. Done both for pyloric caeca and liver in the paper, we will do it for pyloric caeca.
 For differential expression analysis between wild and domesticated under any diet, we use egdeR, using a full interaction model (see paper) -> output will be p-values 
 Adjust p-values using FDR, genes are deferentially expressed if  q < 0.05 and the absolute log2 fold change >1 between wild and domesticated (=> log2(wild_counts/domesticated_counts).
 KEGG ontology enrichment analysis using edgeR. Enriched pathways were significant if p-value < 0.05. P-values were generated based on a hypergeometric test where the number of DEGs were compared to the total genes annotated to each KO term. 
 To investigate diet specific effects on gene expression, they checked for deferentially expressed genes between wild and domesticated under each diet. The same cut-offs were used as before
+
+a. Do CPM
+a. Rinse out genes with minimum count level of 1 CPM
+
+```{r}
+if (!require("edgeR"))
+    install.packages("edgeR")
+library(edgeR)
+
+# Domesticated
+# character vector of filenames
+fnames <- c()
+for (i in c(3522994:3522997, 3523017:3523025, 3523030:3523033)) {
+  fnames <- append(fnames, paste("ERR", i, "-output_basename.counts", sep=""))
+}
+
+# read file
+labels <- "FO-PC-D"
+rawCountsDomesticated <- edgeR::readDGE(fnames, path="data/salmonCountsDomesticated", columns=c(1,2), labels=labels)
+
+# Wild
+# character vector of filenames
+fnames <- c()
+# modify numbers
+for (i in c(3522994:3522997, 3523017:3523025, 3523030:3523033)) {
+  fnames <- append(fnames, paste("ERR", i, "-output_basename.counts", sep=""))
+}
+
+# read file
+labels <- "FO-PC-W"
+rawCountsWild <- edgeR::readDGE(fnames, path="data/salmonCountsWild", columns=c(1,2), labels=labels)
+
+# concat????
+rawCountsTotal <- dplyr::bind_cols()
+
+# cpm
+logcpmCounts <- edgeR::cpm(rawCounts, log=TRUE) # prior.count=1
+
+# only CPM larger than 1
+rinsedLogcpmCounts <- logcpmCounts[rowSum(logcpmCounts > 1) <= ncol(logcpmCounts)*0.75, ]
+
+# Differentially expressed genes
+
+
+```
+
 
 
 ### Looking at fatty tissue (this)
