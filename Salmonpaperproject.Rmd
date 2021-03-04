@@ -46,6 +46,21 @@ Explore the hypothesis that the change to a vegetable oil diet has unintentional
 
 ### Data analysis
 
+```{bash}
+# directories
+mkdir data
+mkdir data/salmonGenomeIndex
+
+mkdir data/salmonFastqsDomesticated
+mkdir data/salmonFastqsWild
+
+mkdir data/salmonTrimmedFastqsDomesticated
+mkdir data/salmonTrimmedFastqsWild
+
+mkdir data/salmonCountsDomesticated
+mkdir data/salmonCountsWild
+```
+
 0. Get data Domesticated
 Filter for:
 * diet: fish oil
@@ -53,7 +68,8 @@ Filter for:
 * strain: domesticated
 
 ```{bash}
-cat E-MTAB-8306.sdrf.txt | grep -P "\tdomesticated" | grep -P "\tfish\soil" | grep -P "\tpyloric\scaecum" | cut -f37 | tail -n +2 > domesticated.txt
+cat E-MTAB-8306.sdrf.txt | grep -P "\tdomesticated" | grep -P "\tfish\soil" | grep -P "\tpyloric\scaecum" | cut -f37 | tail -n +2 > data/salmonFastqsDomesticated/domesticated.txt
+cd data/salmonFastqsDomesticated/
 wget -N -i domesticated.txt
 ```
 
@@ -63,11 +79,13 @@ Filter for:
 * tissue: pyloric caeca
 * strain: wild
 
-(not run)
+(running)
 ```{bash} 
-cat E-MTAB-8306.sdrf.txt | grep -P "\twild" | grep -P "\tfish\soil" | grep -P "\tpyloric\scaecum" | cut -f37 | tail -n +2 > wild.txt
+cat E-MTAB-8306.sdrf.txt | grep -P "\twild" | grep -P "\tfish\soil" | grep -P "\tpyloric\scaecum" | cut -f37 | tail -n +2 > data/salmonFastqsWild/wild.txt
+cd data/salmonFastqsWild/
 wget -N -i wild.txt
 ```
+
 
 
 Preprocess data
@@ -80,9 +98,18 @@ AGATCGGAAGAGCACACGTCTGAACTCCAGTCA. Here it also filter out read shorter than 40 
 
 Domesticated:
 ```{bash}
-for i in {3522994..3522997} {3523017..3523025} {3523030..3523033};
-do cutadapt --report=minimal -q 20 -m 40 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA ERR${i}.fastq.gz > ERR${i}_trimmed.fastq.gz;
+for i in {3522996..3522997} {3523017..3523025} {3523030..3523033};
+do cutadapt --report=minimal -q 20 -m 40 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA data/salmonFastqsDomesticated/ERR${i}.fastq.gz > data/salmonTrimmedFastqsDomesticated/ERR${i}_trimmed.fastq.gz;
 done
+
+#```
+#Wild:
+#```{bash}
+# change numbers
+for i in {3522996..3522997} {3523017..3523037};
+do cutadapt --report=minimal -q 20 -m 40 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA data/salmonFastqsWild/ERR${i}.fastq.gz > data/salmonTrimmedFastqsWild/ERR${i}_trimmed.fastq.gz;
+done
+
 
 ```
 
@@ -91,7 +118,6 @@ done
 Get the FASTA-files with the Salmo Salar reference genome (ICSASG_v2) from https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/233/375/GCF_000233375.1_ICSASG_v2/GCF_000233375.1_ICSASG_v2_genomic.fna.gz
 
 ```{bash}
-mkdir data
 wget https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/233/375/GCF_000233375.1_ICSASG_v2/GCF_000233375.1_ICSASG_v2_genomic.fna.gz
 mkdir data/salmonReferenceGenome
 mv GCF_000233375.1_ICSASG_v2_genomic.fna.gz data/salmonReferenceGenome
@@ -107,12 +133,9 @@ mv GCF_000233375.1_ICSASG_v2_genomic.gff.gz data/salmonAnnotationGenome
 
 ```
 
-Align all read sequences from FASTQ-files to FASTA-files with star.
+Annotate the reference genome with star.
 
 ```{bash}
-# make directory /data/salmonGenomeIndex
-mkdir data/salmonGenomeIndex
-
 # GFF to GTF, unziped
 gffread <(gunzip -c data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gff.gz) -T -o data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gtf
 
@@ -131,25 +154,28 @@ grep ">" data/salmonReferenceGenome/GCF_000233375.1_ICSASG_v2_genomic.fna | wc -
 # create a genome annotation index
 STAR --runMode genomeGenerate --genomeDir data/salmonGenomeIndex/ --genomeFastaFiles data/salmonReferenceGenome/GCF_000233375.1_ICSASG_v2_genomic.fna --sjdbGTFfile data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gtf --sjdbOverhang 100 --limitGenomeGenerateRAM 168253806176 --genomeChrBinNbits 14
 
+```
 
+Align all read sequences from FASTQ-files to FASTA-files with star.
+
+```{bash}
 # (not run)
+# test one first!!!!
+
+
 # move ERR${i}_trimmed.fastq.gz to /data/salmonTrimmedFastqs and delete 
 # map the trimmed sequences to the index
 # Domesticated
-mkdir data/salmonTrimmedFastqsDomesticated
-for i in {3522994..3522997} {3523017..3523025} {3523030..3523033};
-do mv ERR${i}_trimmed.fastq.gz /data/salmonTrimmedFastqsDomesticated;
-do rm ERR${i}.fastq.gz;
-do STAR --genomeDir data/salmonGenomeIndex/ --readFilesIn <(gunzip -c data/salmonTrimmedFastqsDomesticated/ERR${i}_trimmed.fastq.gz) --outSAMtype BAM SortedByCoordinate --outFileNamePrefix ERR${i}; #where do the files go?
+
+for i in {3522996..3522997} {3523017..3523025} {3523030..3523033};
+STAR --genomeDir data/salmonGenomeIndex --readFilesIn <(gunzip -c data/salmonTrimmedFastqsDomesticated/ERR${i}_trimmed.fastq.gz) --outSAMtype BAM SortedByCoordinate --outFileNamePrefix ERR${i};
 done
 
-# (modify numbers, run)
+#where do the files go?
+
 # Wild 
-mkdir data/salmonTrimmedFastqsWild
-for i in {3522994..3522997} {3523017..3523025} {3523030..3523033};
-do cutadapt --report=minimal -q 20 -m 40 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA ERR${i}.fastq.gz > data/salmonTrimmedFastqsWild/ERR${i}_trimmed.fastq.gz;
-do rm ERR${i}.fastq.gz;
-do STAR --genomeDir data/salmonGenomeIndex/ --readFilesIn <(gunzip -c data/salmonTrimmedFastqsWild/ERR${i}_trimmed.fastq.gz) --outSAMtype BAM SortedByCoordinate --outFileNamePrefix ERR${i}; #where do the files go?
+for i in {3522996..3522997} {3523017..3523037};
+STAR --genomeDir data/salmonGenomeIndex --readFilesIn <(gunzip -c data/salmonTrimmedFastqsWild/ERR${i}_trimmed.fastq.gz) --outSAMtype BAM SortedByCoordinate --outFileNamePrefix ERR${i}; #where do the files go?
 done
 
 ```
@@ -164,7 +190,7 @@ Generate raw gene counts using htsec.
 
 ```{bash}
 # Domesticated
-mkdir data/salmonCountsDomesticated
+
 # Convert BAM Files to Raw Counts with HTSeq
 for i in {3522994..3522997} {3523017..3523025} {3523030..3523033};
 do htseq-count -s no -r pos —t exon -i pacid -f bam data/salmonGenomeIndex/ERR${i}Aligned.sortedByCoord.out.bam data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gtf > dada/salmonCountsDomesticated/ERR${i}-output_basename.counts;
@@ -172,7 +198,7 @@ done
 
 # Wild
 # (modify numbers)
-mkdir data/salmonCountsWild
+
 # Convert BAM Files to Raw Counts with HTSeq
 for i in {3522994..3522997} {3523017..3523025} {3523030..3523033};
 do htseq-count -s no -r pos —t exon -i pacid -f bam data/salmonGenomeIndex/ERR${i}Aligned.sortedByCoord.out.bam data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gtf > dada/salmonCountsWild/ERR${i}-output_basename.counts;
