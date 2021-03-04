@@ -98,15 +98,14 @@ AGATCGGAAGAGCACACGTCTGAACTCCAGTCA. Here it also filter out read shorter than 40 
 
 Domesticated:
 ```{bash}
-for i in {3522996..3522997} {3523017..3523025} {3523030..3523033};
+for i in {3522994..3522997} {3523017..3523025} {3523030..3523033};
 do cutadapt --report=minimal -q 20 -m 40 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA data/salmonFastqsDomesticated/ERR${i}.fastq.gz > data/salmonTrimmedFastqsDomesticated/ERR${i}_trimmed.fastq.gz;
 done
 
 #```
 #Wild:
 #```{bash}
-# change numbers
-for i in {3522996..3522997} {3523017..3523037};
+for i in {3523032..3523037};
 do cutadapt --report=minimal -q 20 -m 40 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA data/salmonFastqsWild/ERR${i}.fastq.gz > data/salmonTrimmedFastqsWild/ERR${i}_trimmed.fastq.gz;
 done
 
@@ -152,7 +151,7 @@ grep ">" data/salmonReferenceGenome/GCF_000233375.1_ICSASG_v2_genomic.fna | wc -
 
 
 # create a genome annotation index
-STAR --runMode genomeGenerate --genomeDir data/salmonGenomeIndex/ --genomeFastaFiles data/salmonReferenceGenome/GCF_000233375.1_ICSASG_v2_genomic.fna --sjdbGTFfile data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gtf --sjdbOverhang 100 --limitGenomeGenerateRAM 168253806176 --genomeChrBinNbits 14
+STAR --runMode genomeGenerate --genomeDir data/salmonGenomeIndex/ --genomeFastaFiles data/salmonReferenceGenome/GCF_000233375.1_ICSASG_v2_genomic.fna --sjdbGTFfile data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gtf --sjdbOverhang 99 --genomeChrBinNbits 14 --genomeSAsparseD 2 --limitGenomeGenerateRAM 20000000000 --runThreadN 8
 
 ```
 
@@ -165,17 +164,23 @@ Align all read sequences from FASTQ-files to FASTA-files with star.
 
 # move ERR${i}_trimmed.fastq.gz to /data/salmonTrimmedFastqs and delete 
 # map the trimmed sequences to the index
+
+# to reduce computations, don't use:
+# Domesticated: {19...25} {3523030..3523033} 
+# Wild: {3522996..3522997} {17..31}
+
 # Domesticated
 
-for i in {3522996..3522997} {3523017..3523025} {3523030..3523033};
-STAR --genomeDir data/salmonGenomeIndex --readFilesIn <(gunzip -c data/salmonTrimmedFastqsDomesticated/ERR${i}_trimmed.fastq.gz) --outSAMtype BAM SortedByCoordinate --outFileNamePrefix ERR${i};
+STAR --genomeDir data/salmonGenomeIndex --readFilesIn data/salmonTrimmedFastqsDomesticated/ERR3523019_trimmed.fastq.gz --outSAMtype BAM SortedByCoordinate --outFileNamePrefix ERR3523019
+
+for i in {3522994..3522997} {3523017..3523018};
+do STAR --genomeDir data/salmonGenomeIndex --readFilesIn <(gunzip -c data/salmonTrimmedFastqsDomesticated/ERR${i}_trimmed.fastq.gz) --outSAMtype BAM SortedByCoordinate --outFileNamePrefix ERR${i};
 done
 
 #where do the files go?
-
 # Wild 
-for i in {3522996..3522997} {3523017..3523037};
-STAR --genomeDir data/salmonGenomeIndex --readFilesIn <(gunzip -c data/salmonTrimmedFastqsWild/ERR${i}_trimmed.fastq.gz) --outSAMtype BAM SortedByCoordinate --outFileNamePrefix ERR${i}; #where do the files go?
+for i in {3523032..3523037};
+do STAR --genomeDir data/salmonGenomeIndex --readFilesIn <(gunzip -c data/salmonTrimmedFastqsWild/ERR${i}_trimmed.fastq.gz) --outSAMtype BAM SortedByCoordinate --outFileNamePrefix ERR${i}; #where do the files go?
 done
 
 ```
@@ -190,6 +195,8 @@ Generate raw gene counts using htsec.
 
 ```{bash}
 # Domesticated
+
+# (change numbers!)
 
 # Convert BAM Files to Raw Counts with HTSeq
 for i in {3522994..3522997} {3523017..3523025} {3523030..3523033};
