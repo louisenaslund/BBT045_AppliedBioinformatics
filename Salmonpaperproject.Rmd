@@ -171,16 +171,18 @@ Align all read sequences from FASTQ-files to FASTA-files with star.
 
 # Domesticated
 
-STAR --genomeDir data/salmonGenomeIndex --readFilesIn data/salmonTrimmedFastqsDomesticated/ERR3523019_trimmed.fastq.gz --outSAMtype BAM SortedByCoordinate --outFileNamePrefix ERR3523019
+STAR --genomeDir data/salmonGenomeIndex --readFilesIn data/salmonTrimmedFastqsDomesticated/ERR3523019_trimmed.fastq.gz --outSAMtype BAM SortedByCoordinate --outFileNamePrefix data/salmonAlignedDomesticated/ERR3523019
+
+mkdir data/salmonAlignedDomesticated
+mkdir data/salmonAlignedWild
 
 for i in {3522994..3522997} {3523017..3523018};
-do STAR --genomeDir data/salmonGenomeIndex --readFilesIn <(gunzip -c data/salmonTrimmedFastqsDomesticated/ERR${i}_trimmed.fastq.gz) --outSAMtype BAM SortedByCoordinate --outFileNamePrefix ERR${i};
+do STAR --genomeDir data/salmonGenomeIndex --readFilesIn data/salmonTrimmedFastqsDomesticated/ERR${i}_trimmed.fastq.gz --outSAMtype BAM SortedByCoordinate --outFileNamePrefix data/salmonAlignedDomesticated/ERR${i};
 done
 
-#where do the files go?
 # Wild 
 for i in {3523032..3523037};
-do STAR --genomeDir data/salmonGenomeIndex --readFilesIn <(gunzip -c data/salmonTrimmedFastqsWild/ERR${i}_trimmed.fastq.gz) --outSAMtype BAM SortedByCoordinate --outFileNamePrefix ERR${i}; #where do the files go?
+do STAR --genomeDir data/salmonGenomeIndex --readFilesIn data/salmonTrimmedFastqsWild/ERR${i}_trimmed.fastq.gz --outSAMtype BAM SortedByCoordinate --outFileNamePrefix data/salmonAlignedWild/ERR${i};
 done
 
 ```
@@ -196,19 +198,18 @@ Generate raw gene counts using htsec.
 ```{bash}
 # Domesticated
 
-# (change numbers!)
+htseq-count -s no -r pos -t exon -i pacid -f bam data/salmonAlignedDomesticated/ERR3523019Aligned.sortedByCoord.out.bam data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gff > data/salmonCountsDomesticated/ERR3523019-output_basename.counts
+
 
 # Convert BAM Files to Raw Counts with HTSeq
-for i in {3522994..3522997} {3523017..3523025} {3523030..3523033};
-do htseq-count -s no -r pos —t exon -i pacid -f bam data/salmonGenomeIndex/ERR${i}Aligned.sortedByCoord.out.bam data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gtf > dada/salmonCountsDomesticated/ERR${i}-output_basename.counts;
+for i in {3522994..3522997} {3523017..3523018};
+do htseq-count -s no -r pos -t exon -i ID -f bam data/salmonAlignedDomesticated/ERR${i}Aligned.sortedByCoord.out.bam data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gff > data/salmonCountsDomesticated/ERR${i}-output_basename.counts;
 done
 
 # Wild
-# (modify numbers)
-
 # Convert BAM Files to Raw Counts with HTSeq
-for i in {3522994..3522997} {3523017..3523025} {3523030..3523033};
-do htseq-count -s no -r pos —t exon -i pacid -f bam data/salmonGenomeIndex/ERR${i}Aligned.sortedByCoord.out.bam data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gtf > dada/salmonCountsWild/ERR${i}-output_basename.counts;
+for i in {3523032..3523037};
+do htseq-count -s no -r pos -t exon -i ID -f bam data/salmonAlignedWild/ERR${i}Aligned.sortedByCoord.out.bam data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gff > data/salmonCountsWild/ERR${i}-output_basename.counts;
 done
 
 ```
@@ -218,80 +219,88 @@ done
 
 4. NORMALIZE COUNT
 CPM (Counts per million)
-Filter the CPM counts so that we keep genes that have a CPM count >1 in more than 25% of the samples. Done both for pyloric caeca and liver in the paper, we will do it for pyloric caeca.
-For differential expression analysis between wild and domesticated under any diet, we use egdeR, using a full interaction model (see paper) -> output will be p-values 
-Adjust p-values using FDR, genes are deferentially expressed if  q < 0.05 and the absolute log2 fold change >1 between wild and domesticated (=> log2(wild_counts/domesticated_counts).
-KEGG ontology enrichment analysis using edgeR. Enriched pathways were significant if p-value < 0.05. P-values were generated based on a hypergeometric test where the number of DEGs were compared to the total genes annotated to each KO term. 
-To investigate diet specific effects on gene expression, they checked for deferentially expressed genes between wild and domesticated under each diet. The same cut-offs were used as before
+Filter the CPM counts so that we keep genes that have a CPM count >1 in more than 25% of the samples. 
+
+
+For differential expression analysis between wild and domesticated, we use egdeR, using a full interaction model (see paper) -> output will be p-values 
+Adjust p-values using FDR (?????), genes are deferentially expressed if  q < 0.05 and the absolute log2 fold change >1 between wild and domesticated (=> log2(wild_counts/domesticated_counts).
+
 
 a. Do CPM
-a. Rinse out genes with minimum count level of 1 CPM
+b. Rinse out genes with minimum count level of 1 CPM
 
 ```{r}
+setwd("~/bioinfo/salmonproject/BBT045_AppliedBioinformatics")
 if (!require("edgeR"))
     install.packages("edgeR")
 library(edgeR)
 
 # Domesticated
 # character vector of filenames
-fnames <- c()
-for (i in c(3522994:3522997, 3523017:3523025, 3523030:3523033)) {
-  fnames <- append(fnames, paste("ERR", i, "-output_basename.counts", sep=""))
+# {3522994..3522997} {3523017..3523018}
+fnames_domesticated <- c()
+for (i in c(3522994:3522997, 3523017:3523018)) {
+  fnames_domesticated <- append(
+    fnames_domesticated, 
+    paste("ERR", i, "-output_basename.counts", sep=""))
 }
 
 # read file
-labels <- "FO-PC-D"
-rawCountsDomesticated <- edgeR::readDGE(fnames, path="data/salmonCountsDomesticated", columns=c(1,2), labels=labels)
+rawCountsDomesticated <- edgeR::readDGE(
+  fnames_domesticated, 
+  path="data/salmonCountsDomesticated",
+  columns=c(1,2))
 
 # Wild
 # character vector of filenames
-fnames <- c()
+fnames_wild <- c()
 # modify numbers
-for (i in c(3522994:3522997, 3523017:3523025, 3523030:3523033)) {
-  fnames <- append(fnames, paste("ERR", i, "-output_basename.counts", sep=""))
+# {3523032..3523037}
+for (i in c(3523032:3523037)) {
+  fnames_wild <- append(
+    fnames_wild, 
+    paste("ERR", i, "-output_basename.counts", sep=""))
 }
 
 # read file
-labels <- "FO-PC-W"
-rawCountsWild <- edgeR::readDGE(fnames, path="data/salmonCountsWild", columns=c(1,2), labels=labels)
+rawCountsWild <- edgeR::readDGE(
+  fnames_wild, 
+  path="data/salmonCountsWild", 
+  columns=c(1,2))
 
-# concat????
-rawCountsTotal <- dplyr::bind_cols()
-
-# cpm
-logcpmCounts <- edgeR::cpm(rawCounts, log=TRUE) # prior.count=1
+# raw count to CPM
+logcpmCountsDomesticated <- edgeR::cpm(rawCountsDomesticated, log=TRUE) # prior.count=1
+logcpmCountsWild <- edgeR::cpm(rawCountsWild, log=TRUE) # prior.count=1
 
 # only CPM larger than 1
-rinsedLogcpmCounts <- logcpmCounts[rowSum(logcpmCounts > 1) <= ncol(logcpmCounts)*0.75, ]
+#rinsedLogcpmCounts <- logcpmCounts[rowSum(logcpmCounts > 1) <= ncol(logcpmCounts)*0.75, ]
 
 # Differentially expressed genes
+# ????
+  
+# PCA
 
+pcaDomesticated <- prcomp(
+  logcpmCountsDomesticated, 
+  ntop = 2, 
+  scale = TRUE, 
+  verbose = TRUE)
+summary(pcaDomesticated)
+#https://rdrr.io/github/bedapub/ribiosNGS/man/prcomp.DGEList.html
+# https://www.biostars.org/p/282685/
+
+plot(
+  pcaDomesticated$x,
+  col = "orange")
+plot(
+  pcaWild$x,
+  col = "skyblue",
+  add=T)
+legend(
+  "bottomright",
+  legend=c("Domesticated", "Wild"), 
+  fill=c("red", "green"))
 
 ```
 
 
-
-### Looking at fatty tissue (this)
-Original paper did this, we did not.
-To test the effect of strain and the diet on fatty acid composition, two-way ANOVA and Tukey’s HSD post-hoc test were done in R. 
-Different lipids, tissue or sampling data were analysed separated. Differences were considered significant at p < 0.05.
-
-## Results
-From article
-(from the initial filtering step we should have 28 980 and 24 119 genes in pyloric caeca and liver, respectively).
-A principal component analysis (PCA) on the log2 CPM of the top 1000 most variable genes showed a clear separation between wild and domesticated for both tissues. 
-The first differential expression analysis between the wild and domesticated salmon resulted in 187 DEGs in the pyloric caeca and 379 in the liver. 
-The KEGG analysis resulted in 17 and 11 enriched pathways in the pyloric caeca and liver, respectively.
-
-Comparison of fatty acid composition between domesticated and wild salmon:
-More variation because of diet than by strain.
-Difference of 85%  between diets.
-Difference of 32% between wild and domesticated salmons.
-VO diet showed higher levels of 18:3n-3 and 18:2n-6 but lower content of longer chain fatty acids.
-Wild fish contain higher contents of 18:3n-3, 18:2n-6 and 20:3n-3  than domesticated (with VO diet).
-Wild fish contain lower content of ARA, 18:4n-3, 18:3n-6 and 18:4n-6 than domesticated (with VO diet).
-No differences in DHA and EPA contents between wild and domesticated salmon fed the same diets.
-
-## Discussion
-
-This was hard, this was easier.
