@@ -245,12 +245,6 @@ for (i in c(3522994:3522997, 3523017:3523018)) {
     paste("ERR", i, "-output_basename.counts", sep=""))
 }
 
-# read file
-rawCountsDomesticated <- edgeR::readDGE(
-  fnames_domesticated, 
-  path="data/salmonCountsDomesticated",
-  columns=c(1,2))
-
 # Wild
 # character vector of filenames
 fnames_wild <- c()
@@ -262,11 +256,47 @@ for (i in c(3523032:3523037)) {
     paste("ERR", i, "-output_basename.counts", sep=""))
 }
 
-# read file
-rawCountsWild <- edgeR::readDGE(
-  fnames_wild, 
-  path="data/salmonCountsWild", 
+####### NEW ########
+
+#We want to put the wild .counts files in the same directory as domesticated (salmonCountsDomesticated). Then put all the file names in the same vector so that when we run readDGE we get a DGE for ALL our files domesticated and wild! 
+
+tot_fnames <- c(fnames_domesticated, fnames_wild)
+
+group <- c("D","D","D","D","D","D","W","W","W","W","W","W") #domesticated =D, wild =W
+
+rawcounts <- edgeR::readDGE(
+  tot_fnames,  
+  path="data/salmonCountsDomesticated",
+  group = group,
   columns=c(1,2))
+
+#Then we have to estimate the dispersion in order to fit a negative binomial model
+dispersion <- edgeR::estimateCommonDisp(rawcounts) #output is new DGE list with new objects
+names(dispersion)
+
+#Exact test tests for negative binomial distribution by pairwise comparison between groups D and W
+DE_genes <- edgeR::exactTest(dispersion)
+names(DE_genes) 
+names(DE_genes$tabel) #should give us "logConc", "logFC", "p.value"
+
+ajd_pvalue <- edgeR::topTags(DE_genes, adjust.method = "BH", n=20, p.value = 0.05) #p.value is cut-off for adjusted p-values (q values), so from article it should be 0.05. Use sort.by = PValue (default)or logFC to sort the output. Adjusting through FDR See help page for more. Here we get the n=20 top differentially expressed genes
+
+########### END NEW ##########
+
+#If new code works, remove this!
+# read file
+#rawCountsDomesticated <- edgeR::readDGE(
+#  fnames_domesticated, 
+#  path="data/salmonCountsDomesticated",
+#  columns=c(1,2))
+
+# read file
+#rawCountsWild <- edgeR::readDGE(
+# fnames_wild, 
+ # path="data/salmonCountsWild", 
+ # columns=c(1,2))
+
+#If new code works change line 302 & 303 to logCPM <- edgeR::cpm(rawcounts, log =TRUE), and change the PCA plots!
 
 # raw count to CPM
 logcpmCountsDomesticated <- edgeR::cpm(rawCountsDomesticated, log=TRUE) # prior.count=1
