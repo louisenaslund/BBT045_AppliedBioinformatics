@@ -270,8 +270,13 @@ rawcounts <- edgeR::readDGE(
   group = group,
   columns=c(1,2))
 
+#Normalize (CPM) and filter before doing DE test
+logCPM <- edgeR::cpm(rawcounts, log =TRUE)
+genes_to_keep <- edgeR::filterByExpr(logCPM, group = group, min.count = 1)
+logCPM <-logCP[genes_to_keep, keep.lib.size = FALSE] #logCPM is now filtered
+
 #Then we have to estimate the dispersion in order to fit a negative binomial model
-dispersion <- edgeR::estimateCommonDisp(rawcounts) #output is new DGE list with new objects
+dispersion <- edgeR::estimateCommonDisp(logCPM) #output is new DGE list with new objects
 names(dispersion)
 
 #Exact test tests for negative binomial distribution by pairwise comparison between groups D and W
@@ -283,7 +288,7 @@ ajd_pvalue <- edgeR::topTags(DE_genes, adjust.method = "BH", n=20, p.value = 0.0
 
 ########### END NEW ##########
 
-#If new code works, remove this!
+#If new code works, remove this:
 # read file
 #rawCountsDomesticated <- edgeR::readDGE(
 #  fnames_domesticated, 
@@ -296,8 +301,7 @@ ajd_pvalue <- edgeR::topTags(DE_genes, adjust.method = "BH", n=20, p.value = 0.0
  # path="data/salmonCountsWild", 
  # columns=c(1,2))
 
-#If new code works change line 302 & 303 to logCPM <- edgeR::cpm(rawcounts, log =TRUE), and change the PCA plots!
-
+#If new code works remove this: 
 # raw count to CPM
 logcpmCountsDomesticated <- edgeR::cpm(rawCountsDomesticated, log=TRUE) # prior.count=1
 logcpmCountsWild <- edgeR::cpm(rawCountsWild, log=TRUE) # prior.count=1
@@ -305,6 +309,7 @@ logcpmCountsWild <- edgeR::cpm(rawCountsWild, log=TRUE) # prior.count=1
 # only CPM larger than 1
 #rinsedLogcpmCounts <- logcpmCounts[rowSum(logcpmCounts > 1) <= ncol(logcpmCounts)*0.75, ]
 
+################
 # Differentially expressed genes
 # ????
   
