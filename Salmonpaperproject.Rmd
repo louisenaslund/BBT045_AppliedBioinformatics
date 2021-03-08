@@ -1,19 +1,21 @@
 ---
-title: "R Notebook"
-#output: html_notebook
+title: "Reproducing trancriptomicsanalysis from study on the effectsof domestication in atlanticsalmon"
+output: html_notebook
 ---
 
 # Salmon project
 
 By: Amalia de Juana, Louise Stauber Näslund, Hanna Linn
 
-This is a recreation of parts of the paper:
+Attempt to recreate of some results parts of the paper:
 Jin Y, Olsen RE, Harvey TN, et al.
 Comparative transcriptomics reveals domestication-associated
 features of Atlantic salmon lipid metabolism. Mol Ecol.
 2020;29:1860–1872. https://doi.org/10.1111/mec.15446
 
-"As a team, you will write a short report (max 1500-2000 words, try to be concise!) in article format (Introduction, results, discussion, methods sections at least should be there)"
+-------------------------------- bash --------------------------------
+
+# ENVIRONMENT
 
 Setting up an environment:
 ```{bash}
@@ -22,8 +24,6 @@ conda create --name salmonenvironment
 source activate salmonenvironment
 conda install -c bioconda htseq cutadapt star gffread
 ```
-Also source ~/.bashrc if above does not work.
-
 
 Restarting the environment:
 ```{bash}
@@ -31,20 +31,6 @@ source ~/.bashrc
 source activate salmonenvironment
 ```
 
-
-## Introduction
-
-Domestication is a thing that happens
-Explain different type of diets
-Our aim:
-Investigate the effects of domestication on metabolism in Atlantic salmon.
-Explore the hypothesis that the change to a vegetable oil diet has unintentionally selected for a domestication-specific lipid metabolism.
-
-
-## Methods
-
-
-### Data analysis
 
 ```{bash}
 # directories
@@ -61,7 +47,8 @@ mkdir data/salmonCountsDomesticated
 mkdir data/salmonCountsWild
 ```
 
-0. Get data Domesticated
+# Get data
+## Get data Domesticated
 Filter for:
 * diet: fish oil
 * tissue: pyloric caeca
@@ -73,7 +60,7 @@ cd data/salmonFastqsDomesticated/
 wget -N -i domesticated.txt
 ```
 
-0. Get data Wild
+## Get data Wild
 Filter for:
 * diet: fish oil
 * tissue: pyloric caeca
@@ -86,12 +73,9 @@ cd data/salmonFastqsWild/
 wget -N -i wild.txt
 ```
 
+# Preprocess data
 
-
-Preprocess data
-
-In bash:
-1. REMOVE ADAPTERS AND FILTER DATA (method ok, data usure, no space)
+## REMOVE ADAPTERS AND FILTER DATA
 Get FASTQ-files from https://www.ebi.ac.uk/arrayexpress/experiments/E-MTAB-8306/.
 Remove adapters in the FASTQ-files with cutadapt. Using Read 1 from https://support.illumina.com/content/dam/illumina-support/documents/documentation/chemistry_documentation/experiment-design/illumina-adapter-sequences-1000000002694-14.pdf
 AGATCGGAAGAGCACACGTCTGAACTCCAGTCA. Here it also filter out read shorter than 40 nucleotides and reads with quality score below 20.
@@ -109,11 +93,9 @@ for i in {3523032..3523037};
 do cutadapt --report=minimal -q 20 -m 40 -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCA data/salmonFastqsWild/ERR${i}.fastq.gz > data/salmonTrimmedFastqsWild/ERR${i}_trimmed.fastq.gz;
 done
 
-
 ```
 
-
-2. ALIGN
+## ALIGN
 Get the FASTA-files with the Salmo Salar reference genome (ICSASG_v2) from https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/233/375/GCF_000233375.1_ICSASG_v2/GCF_000233375.1_ICSASG_v2_genomic.fna.gz
 
 ```{bash}
@@ -158,24 +140,14 @@ STAR --runMode genomeGenerate --genomeDir data/salmonGenomeIndex/ --genomeFastaF
 Align all read sequences from FASTQ-files to FASTA-files with star.
 
 ```{bash}
-# (not run)
-# test one first!!!!
-
-
-# move ERR${i}_trimmed.fastq.gz to /data/salmonTrimmedFastqs and delete 
-# map the trimmed sequences to the index
-
 # to reduce computations, don't use:
 # Domesticated: {19...25} {3523030..3523033} 
 # Wild: {3522996..3522997} {17..31}
 
-# Domesticated
-
-STAR --genomeDir data/salmonGenomeIndex --readFilesIn data/salmonTrimmedFastqsDomesticated/ERR3523019_trimmed.fastq.gz --outSAMtype BAM SortedByCoordinate --outFileNamePrefix data/salmonAlignedDomesticated/ERR3523019
-
 mkdir data/salmonAlignedDomesticated
 mkdir data/salmonAlignedWild
 
+# Domesticated
 for i in {3522994..3522997} {3523017..3523018};
 do STAR --genomeDir data/salmonGenomeIndex --readFilesIn data/salmonTrimmedFastqsDomesticated/ERR${i}_trimmed.fastq.gz --outSAMtype BAM SortedByCoordinate --outFileNamePrefix data/salmonAlignedDomesticated/ERR${i};
 done
@@ -187,20 +159,17 @@ done
 
 ```
 
+Material:
 Manual for star https://github.com/alexdobin/STAR/blob/master/doc/STARmanual.pdf
 https://bioinformatics.uconn.edu/resources-and-events/tutorials-2/rna-seq-tutorial-with-reference-genome/
 
 Method from https://bmcgenomics.biomedcentral.com/articles/10.1186/s12864-018-4651-8#Sec2.
 
-3. GENE COUNT
+## GENE COUNT
 Generate raw gene counts using htsec.
 
 ```{bash}
 # Domesticated
-
-htseq-count -s no -r pos -t exon -i pacid -f bam data/salmonAlignedDomesticated/ERR3523019Aligned.sortedByCoord.out.bam data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gff > data/salmonCountsDomesticated/ERR3523019-output_basename.counts
-
-
 # Convert BAM Files to Raw Counts with HTSeq
 for i in {3522994..3522997} {3523017..3523018};
 do htseq-count -s no -r pos -t exon -i ID -f bam data/salmonAlignedDomesticated/ERR${i}Aligned.sortedByCoord.out.bam data/salmonAnnotationGenome/GCF_000233375.1_ICSASG_v2_genomic.gff > data/salmonCountsDomesticated/ERR${i}-output_basename.counts;
@@ -213,28 +182,25 @@ do htseq-count -s no -r pos -t exon -i ID -f bam data/salmonAlignedWild/ERR${i}A
 done
 
 # We want to put the wild .counts files in the same directory as domesticated (salmonCountsDomesticated). Then put all the file names in the same vector so that when we run readDGE in R, we get a DGE for ALL our files domesticated and wild! 
-
 mkdir data/salmonCountsAll
 cp data/salmonCountsDomesticated/* salmonCountsAll/
 cp data/salmonCountsWild/* salmonCountsAll/
 ```
 
 
----------------------- R --------------------------------
+-------------------------------- R --------------------------------
 
-4. NORMALIZE COUNT
-CPM (Counts per million)
-Filter the CPM counts so that we keep genes that have a CPM count >1 in more than 25% of the samples. 
-
-
-For differential expression analysis between wild and domesticated, we use egdeR, using a full interaction model (see paper) -> output will be p-values 
-Adjust p-values using FDR (?????), genes are deferentially expressed if  q < 0.05 and the absolute log2 fold change >1 between wild and domesticated (=> log2(wild_counts/domesticated_counts).
-
-
-a. Do CPM
-b. Rinse out genes with minimum count level of 1 CPM
+## Overview:
+0. Load data into R.
+1. Filter the CPM counts so that we keep genes that have a CPM count >1 in more than 25% of the samples. 
+2. For differential expression analysis between wild and domesticated, we use egdeR, using a full interaction model (see paper) -> output will be p-values.
+Adjust p-values using FDR, genes are deferentially expressed if  q < 0.05 and the absolute log2 fold change >1 between wild and domesticated (=> log2(wild_counts/domesticated_counts).
+3. Do PCA and plot.
 
 ```{r}
+
+# 0. Load data into R.
+
 setwd("~/bioinfo/salmonproject/BBT045_AppliedBioinformatics")
 if (!require("edgeR"))
     install.packages("edgeR")
@@ -262,11 +228,12 @@ for (i in c(3523032:3523037)) {
     paste("ERR", i, "-output_basename.counts", sep=""))
 }
 
-
+# Concatenate
 tot_fnames <- c(fnames_domesticated, fnames_wild)
 
-group <- c("D","D","D","D","W","W","W","W","W","W") #domesticated = D, wild = W
+group <- c("D","D","D","D","W","W","W","W","W","W") # domesticated = D, wild = W
 
+# Load data
 rawCounts <- edgeR::readDGE(
   tot_fnames,  
   path="data/salmonCountsAll",
@@ -274,20 +241,24 @@ rawCounts <- edgeR::readDGE(
   columns=c(1,2),
   header=FALSE)
 
+
+# 1. Filter the CPM counts so that we keep genes that have a CPM count >1 in more than 25% of the samples. 
+
 # Normalize (CPM) and filter before doing DEG test (filterByExpr does CPM)
 genesToKeep <- edgeR::filterByExpr(rawCounts, group = group, min.count = 1)
 
 filteredCounts <- rawCounts[genesToKeep, keep.lib.size = FALSE] # logCPM is now filtered
 
-########## DEG ##############
-# Then we have to estimate the dispersion in order to fit a negative binomial model
+# 2. For differential expression analysis between wild and domesticated, we use egdeR, using a full interaction model (see paper) -> output will be p-values. Adjust p-values using FDR, genes are deferentially expressed if  q < 0.05 and the absolute log2 fold change >1 between wild and domesticated (=> log2(wild_counts/domesticated_counts).
+
+# Then we have to estimate the dispersion in order to fit a negative binomial model.
 dispersion <- edgeR::estimateCommonDisp(filteredCounts) # output is new DGE list with new objects
 names(dispersion) # shows stuff
 
-# Exact test tests for negative binomial distribution by pairwise comparison between groups D and W
+# Exact test tests for negative binomial distribution by pairwise comparison between groups D and W.
 DEG <- edgeR::exactTest(dispersion)
 print(DEG) 
-names(DEG$table) #should give us "logConc", "logFC", "p.value"
+names(DEG$table) #should give us "logConc", "logFC", "p.value", yes it does
 
 adjusted_pvalue <- edgeR::topTags(DEG, adjust.method = "BH", n=1000) # p.value is cut-off for adjusted p-values (q values), so from article it should be 0.05. Use sort.by = PValue (default)or logFC to sort the output. Adjusting through FDR See help page for more.
 adjustedKeep <- adjusted_pvalue$table$FDR <= 0.05 & abs(adjusted_pvalue$table$logFC) >= 1
@@ -298,40 +269,28 @@ adjusted_pvalueFDR <- as.data.frame(adjusted_pvalueTOP[,4])
 print(length(adjusted_pvalueFDR[adjusted_pvalueFDR<=0.05]))
 
 
+# 3. Do PCA and plot.
+
 # PCA: Principal components analysis (PCA) on log2 CPM of the
-# top 1,000 most variable genes revealed a clear separation of domesticated and wild salmon in both pyloric caeca and liver (Figure 2).
-filteredCountsDomesticated <- filteredCounts[, which(filteredCounts$samples$group == 'D')]
-filteredCountsWild <- filteredCounts[, which(filteredCounts$samples$group == 'W')]
+# top 1,000 most variable genes revealed a clear separation of domesticated and wild salmon in both pyloric caeca.
 
-pcaDomesticated <- prcomp(
-  filteredCountsDomesticated, 
-  scale = TRUE)
-summary(pcaDomesticated)
+filteredCountsTOP <- filteredCounts[rownames(filteredCounts) %in% rownames(adjusted_pvalue),]
 
-pcaWild <- prcomp(
-  filteredCountsWild, 
-  scale = TRUE)
-summary(pcaWild)
-
+pcaAll <- prcomp(filteredCountsTOP, scale = TRUE) # does the cpm
+summary(pcaAll)
 # Plotting
-pdf("rplot.pdf") 
-par(cex.lab=1.5)
-plot(
-  pcaDomesticated$x,
-  col = "orange",
-  cex = 4,
-  yaxt='n',
-  xaxt='n')
-par(new=TRUE, cex.lab=1.5)
-plot(
-  pcaWild$x,
-  col = "skyblue",
-  cex = 4)
-legend(
-  "bottomright",
-  legend=c("Domesticated", "Wild"), 
-  fill=c("orange", "skyblue"))
-
+pdf("rplotALL.pdf") 
+par(cex=2) # make fonts larger
+plot(pcaAll$x[,1:2],
+     pch=16,
+     col=c("orange", "skyblue"),
+     main="Recreated pyloric caeca",
+     xlab = 'PC1 (52%)',
+     ylab = 'PC2 (20%)') # 2 first principal components
+legend("bottom",
+       pch=16,
+       col=c("orange", "skyblue"),
+       legend=c("Domesticated", "Wild"))
 # Close the pdf file
 dev.off() 
 
