@@ -4,7 +4,7 @@ The file Salmonpapaerproject.Rmd contains the code of the study. This code recre
 
 The files XX, XX and XX (I don´t know yet the names that these documents are going to have) are self-reflections written by each one of the members of the group who carried out the study. In these files, it is explained what is each one’s part in the study and what has been learned during the project.
 
-The file SalmonProject.pdf (I don´t know yet the names that this document is going to have) is the document which collects all what has been done in the project. It contains an introduction about the project, the used methodology, the obtained results and the discussion of them.
+The file SalmonProject.pdf is the document which collects all what has been done in the project. It contains an introduction about the project, the used methodology, the obtained results and the discussion of them.
 
 The original article can be found in the Wiley Online Library, following the link https://onlinelibrary.wiley.com/doi/pdf/10.1111/mec.15446.
 
